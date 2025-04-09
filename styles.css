@@ -1,0 +1,16 @@
+.page-manager {
+    position: fixed;
+    bottom: -50px; /* 初始位置在屏幕下方 */
+    left: 50%;
+    transform: translateX(-50%);
+    transition: bottom 0.3s ease-in-out;
+    background-color: #f0f0f0;
+    padding: 10px;
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.page-manager:hover {
+    bottom: 0; /* 鼠标悬停时显示在屏幕底部 */
+} 
+

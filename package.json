@@ -1,0 +1,41 @@
+{
+  "name": "11",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "lint": "vue-cli-service lint"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^6.7.2",
+    "@wangeditor/editor": "^5.1.0",
+    "@wangeditor/editor-for-vue": "^1.0.2",
+    "axios": "^1.8.4",
+    "echarts": "^5.6.0",
+    "element-ui": "^2.15.14",
+    "js-cookie": "^2.2.0",
+    "react": "^19.1.0",
+    "react-router-dom": "^7.5.0",
+    "swiper": "^5.4.5",
+    "vue": "^2.7.16",
+    "vue-awesome-swiper": "^4.1.1",
+    "vue-router": "^3.6.5",
+    "vuedraggable": "^2.24.3",
+    "vuex": "^3.6.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-router-dom": "^5.3.3",
+    "@vue/cli-service": "^4.5.19",
+    "cache-loader": "^4.1.0",
+    "sass": "^1.86.3",
+    "sass-loader": "^10.4.1",
+    "webpack": "^4.46.0"
+  }
+}
