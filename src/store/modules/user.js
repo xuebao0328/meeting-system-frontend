@@ -1,5 +1,5 @@
-import { login, getUserInfo } from '@/api'
-import { getToken, setToken } from '@/utils/auth'
+import { login as loginApi } from '@/api/auth'
+import { getToken, setToken, removeToken } from '@/utils/auth'
 
 const state = {
   token: getToken(),
@@ -26,53 +26,57 @@ const mutations = {
 const actions = {
   // user login
   login({ commit }, userInfo) {
-    const { username, password, uuid, code } = userInfo
+    const { username, password } = userInfo
     return new Promise((resolve, reject) => {
-      login({ username: username.trim(), password: password, uuid, code }).then(data => {
-        commit('SET_TOKEN', data.token)
-        setToken(data.token)
+      loginApi({ 
+        loginMethod: 'account',
+        account: username.trim(), 
+        password: password 
+      }).then(response => {
+        const { token, user } = response
+        commit('SET_TOKEN', token)
+        commit('SET_USER_INFO', user)
+        commit('SET_ROLES', ['user']) // 默认角色
+        commit('SET_HAS_GET_INFO', true)
+        setToken(token)
         resolve()
       }).catch(error => {
         reject(error)
       })
     })
   },
+  
   logout({ commit }) {
-    
     return new Promise((resolve) => {
       commit('SET_TOKEN', null)
       commit('SET_USER_INFO', {})
       commit('SET_ROLES', [])
       commit('SET_HAS_GET_INFO', false)
-      setToken(null)
+      removeToken()
       resolve()
     })
   },
-  // get user info
-  getInfo({ commit }) {
-    return new Promise((resolve, reject) => {
-      getUserInfo().then(data => {
-
-        if (!data) {
-          reject('Verification failed, please Login again.')
-        }
-
-        const { roles, user: userInfo } = data
-
-        // roles must be a non-empty array
-        if (!roles || roles.length <= 0) {
-          reject('getInfo: roles must be a non-null array!')
-        }
-
-        
-
-        commit('SET_ROLES', roles)
-        commit('SET_USER_INFO', userInfo)
-        commit('SET_HAS_GET_INFO', true)
-        resolve(data)
-      }).catch(error => {
-        reject(error)
-      })
+  
+  // get user info - we already get it during login
+  getInfo({ commit, state }) {
+    return new Promise((resolve) => {
+      // 如果已经有用户信息，直接返回
+      if (state.hasGetInfo) {
+        resolve({ roles: state.roles, user: state.userInfo })
+        return
+      }
+      
+      // 否则，返回基本信息
+      const userInfo = {
+        name: 'User',
+        avatar: ''
+      }
+      const roles = ['user']
+      
+      commit('SET_ROLES', roles)
+      commit('SET_USER_INFO', userInfo)
+      commit('SET_HAS_GET_INFO', true)
+      resolve({ roles, user: userInfo })
     })
   },
 }

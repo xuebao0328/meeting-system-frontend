@@ -70,11 +70,11 @@
         <div class="user-profile">
           <div class="avatar">SA</div>
           <div class="user-info">
-            <div class="user-name">超级管理员</div>
+            <div class="user-name">{{ username }}</div>
             <div class="user-role">系统管理员</div>
           </div>
         </div>
-        <button class="logout-btn">
+        <button class="logout-btn" @click="logout">
           <i class="fas fa-sign-out-alt"></i>
         </button>
       </div>
@@ -399,6 +399,8 @@
 </template>
 
 <script>
+import { logout } from '@/api/auth';
+
 export default {
   name: 'SuperAdmin',
   data() {
@@ -431,7 +433,8 @@ export default {
       showModal: false,
       currentPage: 1,
       pageSize: 5,
-      totalPages: 5
+      totalPages: 5,
+      username: '超级管理员'
     }
   },
   computed: {
@@ -444,7 +447,21 @@ export default {
       return range;
     }
   },
+  created() {
+    this.fetchUserInfo();
+  },
   methods: {
+    fetchUserInfo() {
+      try {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          this.username = user.username || '超级管理员';
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+      }
+    },
     switchTab(tab) {
       this.currentTab = tab;
     },
@@ -482,6 +499,11 @@ export default {
     },
     changePage(page) {
       this.currentPage = page;
+    },
+    logout() {
+      logout();
+      this.$message.success('退出登录成功');
+      this.$router.push('/login');
     }
   }
 }

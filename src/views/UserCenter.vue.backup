@@ -24,208 +24,175 @@
 
     <!-- 内容区域 -->
     <div class="content-container">
-      <div class="profile-section">
-        <!-- 个人信息卡片 -->
-        <el-card class="info-card" shadow="hover">
-          <div class="card-header">
-            <h3><i class="el-icon-user"></i> 个人资料</h3>
-          </div>
-          <div class="info-header">
-            <div class="avatar-section">
-              <div class="avatar">
-                <img src="/avatar-placeholder.png" alt="用户头像" />
-              </div>
-              <div class="upload-avatar">
-                <el-button type="text" icon="el-icon-camera">更换头像</el-button>
-              </div>
-            </div>
-            <div class="info-section">
-              <div class="info-row">
-                <div class="info-item">
-                  <span class="info-label"><i class="el-icon-user-solid"></i> 姓名：</span>
-                  <span class="info-value">{{ userProfileInfo.name }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label"><i class="el-icon-male"></i> 性别：</span>
-                  <span class="info-value">{{ userProfileInfo.gender }}</span>
-                </div>
-              </div>
-              <div class="info-row">
-                <div class="info-item">
-                  <span class="info-label"><i class="el-icon-mobile-phone"></i> 手机号码：</span>
-                  <span class="info-value">{{ userProfileInfo.phone }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label"><i class="el-icon-message"></i> 电子邮箱：</span>
-                  <span class="info-value">{{ userProfileInfo.email }}</span>
-                </div>
-              </div>
-              <div class="info-row">
-                <div class="info-item">
-                  <span class="info-label"><i class="el-icon-document"></i> 身份证号：</span>
-                  <span class="info-value">{{ userProfileInfo.idNumber }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="edit-button-wrapper">
-              <el-button 
-                type="primary" 
-                icon="el-icon-edit" 
-                class="edit-button"
-                @click="editUserProfile"
-                round
-              >
-                编辑资料
-              </el-button>
+      <!-- 个人信息卡片 -->
+      <el-card class="info-card">
+        <div class="info-header">
+          <div class="avatar-section">
+            <div class="avatar">
+              <img src="/avatar-placeholder.png" alt="用户头像" />
             </div>
           </div>
-        </el-card>
-      </div>
+          <div class="info-section">
+            <div class="info-row">
+              <div class="info-item">
+                <span class="info-label">姓名：</span>
+                <span class="info-value">{{ userProfileInfo.name }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">性别：</span>
+                <span class="info-value">{{ userProfileInfo.gender }}</span>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-item">
+                <span class="info-label">手机号码：</span>
+                <span class="info-value">{{ userProfileInfo.phone }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">电子邮箱：</span>
+                <span class="info-value">{{ userProfileInfo.email }}</span>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-item">
+                <span class="info-label">身份证号：</span>
+                <span class="info-value">{{ userProfileInfo.idNumber }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="edit-button-wrapper">
+            <el-button 
+              icon="el-icon-edit" 
+              class="edit-button"
+              @click="editUserProfile"
+            >
+              编辑
+            </el-button>
+          </div>
+        </div>
+      </el-card>
       
-      <!-- 会议记录卡片 -->
-      <div class="meetings-section">
-        <el-card class="tabs-card" shadow="hover">
-          <div class="card-header">
-            <h3><i class="el-icon-date"></i> 会议记录</h3>
-          </div>
-          <el-tabs v-model="activeProfileTab" @tab-click="handleProfileTabChange" type="border-card">
-            <el-tab-pane label="缴费状态" name="1">
-              <el-table 
-                :data="meetingData" 
-                class="meeting-table"
-                :stripe="true"
-                border
-                style="width: 100%"
+      <!-- 标签页和表格 -->
+      <el-card class="tabs-card">
+        <el-tabs v-model="activeProfileTab" @tab-click="handleProfileTabChange">
+          <el-tab-pane label="缴费状态" name="1">
+            <el-table 
+              :data="meetingData" 
+              class="meeting-table"
+              :stripe="true"
+              border
+            >
+              <el-table-column 
+                prop="name" 
+                label="会议名称" 
+                width="30%" 
+                :show-overflow-tooltip="true"
+              />
+              <el-table-column 
+                prop="amount" 
+                label="缴费金额" 
+              />
+              <el-table-column 
+                prop="status" 
+                label="状态" 
               >
-                <el-table-column 
-                  prop="name" 
-                  label="会议名称" 
-                  width="30%" 
-                  :show-overflow-tooltip="true"
-                />
-                <el-table-column 
-                  prop="amount" 
-                  label="缴费金额" 
-                />
-                <el-table-column 
-                  prop="status" 
-                  label="状态" 
-                >
-                  <template slot-scope="scope">
-                    <el-tag :type="scope.row.status === '待支付' ? 'warning' : (scope.row.status === '已支付' ? 'success' : 'info')">
-                      {{ scope.row.status }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column 
-                  prop="time" 
-                  label="支付时间" 
-                />
-                <el-table-column 
-                  prop="operation" 
-                  label="操作" 
-                >
-                  <template slot-scope="scope">
-                    <el-button v-if="scope.row.operation" type="primary" size="mini" round>
-                      {{ scope.row.operation }}
-                    </el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-              <div class="pagination-container">
-                <el-pagination
-                  @size-change="handleSizeChange"
-                  @current-change="handleCurrentChange"
-                  :current-page="currentPage"
-                  :page-sizes="[5, 10, 20, 50]"
-                  :page-size="pageSize"
-                  layout="total, sizes, prev, pager, next, jumper"
-                  :total="meetingData.length">
-                </el-pagination>
-              </div>
-            </el-tab-pane>
-            <el-tab-pane label="历史记录" name="2">
-              <el-table 
-                :data="meetingData" 
-                class="meeting-table"
-                :stripe="true"
-                style="width: 100%"
+                <template slot-scope="scope">
+                  <el-tag :type="scope.row.status === '待支付' ? 'warning' : 'success'">
+                    {{ scope.row.status }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column 
+                prop="time" 
+                label="支付时间" 
+              />
+              <el-table-column 
+                prop="operation" 
+                label="操作" 
               >
-                <el-table-column 
-                  prop="name" 
-                  label="会议名称" 
-                  width="30%" 
-                  :show-overflow-tooltip="true"
-                />
-                <el-table-column 
-                  prop="amount" 
-                  label="缴费金额" 
-                />
-                <el-table-column 
-                  prop="status" 
-                  label="状态" 
-                >
-                  <template slot-scope="scope">
-                    <el-tag :type="scope.row.status === '待支付' ? 'warning' : (scope.row.status === '已支付' ? 'success' : 'info')">
-                      {{ scope.row.status }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column 
-                  prop="time" 
-                  label="支付时间" 
-                />
-                <el-table-column 
-                  prop="operation" 
-                  label="操作" 
-                >
-                  <template slot-scope="scope">
-                    <el-button v-if="scope.row.operation" type="primary" size="mini" round>
-                      {{ scope.row.operation }}
-                    </el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-              <div class="pagination-container">
-                <el-pagination
-                  @size-change="handleSizeChange"
-                  @current-change="handleCurrentChange"
-                  :current-page="currentPage"
-                  :page-sizes="[5, 10, 20, 50]"
-                  :page-size="pageSize"
-                  layout="total, sizes, prev, pager, next, jumper"
-                  :total="meetingData.length">
-                </el-pagination>
-              </div>
-            </el-tab-pane>
-          </el-tabs>
-        </el-card>
-      </div>
+                <template slot-scope="scope">
+                  <el-button v-if="scope.row.operation" type="text" size="small">
+                    {{ scope.row.operation }}
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="pagination-container">
+              <el-pagination
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+                :current-page="currentPage"
+                :page-sizes="[5, 10, 20, 50]"
+                :page-size="pageSize"
+                layout="total, sizes, prev, pager, next, jumper"
+                :total="meetingData.length">
+              </el-pagination>
+            </div>
+          </el-tab-pane>
+          <el-tab-pane label="历史记录" name="2">
+            <el-table 
+              :data="meetingData" 
+              class="meeting-table"
+              :stripe="true"
+            >
+              <el-table-column 
+                prop="name" 
+                label="会议名称" 
+                width="30%" 
+                :show-overflow-tooltip="true"
+              />
+              <el-table-column 
+                prop="amount" 
+                label="缴费金额" 
+              />
+              <el-table-column 
+                prop="status" 
+                label="状态" 
+              >
+                <template slot-scope="scope">
+                  <el-tag :type="scope.row.status === '待支付' ? 'warning' : 'success'">
+                    {{ scope.row.status }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column 
+                prop="time" 
+                label="支付时间" 
+              />
+              <el-table-column 
+                prop="operation" 
+                label="操作" 
+              >
+                <template slot-scope="scope">
+                  <el-button v-if="scope.row.operation" type="text" size="small">
+                    {{ scope.row.operation }}
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="pagination-container">
+              <el-pagination
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+                :current-page="currentPage"
+                :page-sizes="[5, 10, 20, 50]"
+                :page-size="pageSize"
+                layout="total, sizes, prev, pager, next, jumper"
+                :total="meetingData.length">
+              </el-pagination>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </el-card>
     </div>
 
     <!-- 编辑个人信息弹窗 -->
     <el-dialog 
+      title="编辑个人信息" 
       :visible.sync="editDialogVisible"
-      :close-on-click-modal="false"
-      custom-class="mac-style-dialog"
       width="500px"
+      :close-on-click-modal="false"
     >
-      <div slot="title" class="dialog-title">
-        <div class="mac-window-controls">
-          <button class="mac-close-button" @click="cancelEdit" title="关闭">
-            <span class="mac-close-icon"></span>
-          </button>
-          <button class="mac-minimize-button" title="最小化">
-            <span class="mac-minimize-icon"></span>
-          </button>
-          <button class="mac-maximize-button" title="最大化">
-            <span class="mac-maximize-icon"></span>
-          </button>
-        </div>
-        <h3>编辑个人信息</h3>
-        <div class="header-placeholder"></div>
-      </div>
-
       <el-form :model="editForm" :rules="editRules" ref="editForm" label-width="100px">
         <el-form-item label="姓名" prop="name">
           <el-input v-model="editForm.name" placeholder="请输入姓名"></el-input>
@@ -246,46 +213,20 @@
           <el-input v-model="editForm.idNumber" placeholder="请输入身份证号"></el-input>
         </el-form-item>
       </el-form>
-      
       <div slot="footer" class="dialog-footer">
-        <div class="buttons-container">
-          <button class="dialog-btn warning-btn" @click="showChangePasswordDialog">
-            <i class="el-icon-lock"></i> 修改密码
-          </button>
-          <div>
-            <button class="dialog-btn cancel-btn" @click="cancelEdit">取消</button>
-            <button class="dialog-btn submit-btn" @click="submitEditForm" :disabled="submitLoading">
-              确定 <i class="el-icon-check" v-if="!submitLoading"></i>
-              <i class="el-icon-loading" v-else></i>
-            </button>
-          </div>
-        </div>
+        <el-button @click="cancelEdit">取 消</el-button>
+        <el-button type="primary" @click="submitEditForm" :loading="submitLoading">确 定</el-button>
+        <el-button type="warning" @click="showChangePasswordDialog" style="float: left">修改密码</el-button>
       </div>
     </el-dialog>
     
     <!-- 修改密码弹窗 -->
     <el-dialog 
+      title="修改密码" 
       :visible.sync="passwordDialogVisible"
-      :close-on-click-modal="false"
-      custom-class="mac-style-dialog"
       width="500px"
+      :close-on-click-modal="false"
     >
-      <div slot="title" class="dialog-title">
-        <div class="mac-window-controls">
-          <button class="mac-close-button" @click="cancelPasswordChange" title="关闭">
-            <span class="mac-close-icon"></span>
-          </button>
-          <button class="mac-minimize-button" title="最小化">
-            <span class="mac-minimize-icon"></span>
-          </button>
-          <button class="mac-maximize-button" title="最大化">
-            <span class="mac-maximize-icon"></span>
-          </button>
-        </div>
-        <h3>修改密码</h3>
-        <div class="header-placeholder"></div>
-      </div>
-
       <el-form :model="passwordForm" :rules="passwordRules" ref="passwordForm" label-width="120px">
         <el-form-item label="原密码" prop="oldPassword">
           <el-input v-model="passwordForm.oldPassword" type="password" placeholder="请输入原密码" show-password></el-input>
@@ -303,18 +244,10 @@
           </el-form-item>
         </template>
       </el-form>
-      
       <div slot="footer" class="dialog-footer">
-        <div class="buttons-container">
-          <div style="flex: 1;"></div>
-          <div>
-            <button class="dialog-btn cancel-btn" @click="cancelPasswordChange">取消</button>
-            <button class="dialog-btn submit-btn" @click="submitPasswordForm" :disabled="!oldPasswordVerified || passwordSubmitLoading">
-              确定 <i class="el-icon-check" v-if="!passwordSubmitLoading"></i>
-              <i class="el-icon-loading" v-else></i>
-            </button>
-          </div>
-        </div>
+        <el-button @click="cancelPasswordChange">取 消</el-button>
+        <el-button type="primary" @click="submitPasswordForm" :loading="passwordSubmitLoading" 
+                  :disabled="!oldPasswordVerified">确 定</el-button>
       </div>
     </el-dialog>
   </div>
@@ -597,29 +530,15 @@ export default {
   align-items: center;
   background-color: #fff;
   padding: 15px 20px;
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
 }
 
 .page-title {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: bold;
   color: #333;
-  position: relative;
-  padding-left: 15px;
-}
-
-.page-title:before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background-color: #409EFF;
-  border-radius: 2px;
 }
 
 .user-info {
@@ -631,12 +550,6 @@ export default {
 .notification-icon {
   position: relative;
   cursor: pointer;
-  font-size: 20px;
-  color: #606266;
-}
-
-.notification-icon:hover {
-  color: #409EFF;
 }
 
 .badge {
@@ -661,13 +574,10 @@ export default {
   height: 36px;
   border-radius: 50%;
   object-fit: cover;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  border: 2px solid #fff;
 }
 
 .username {
   font-weight: 500;
-  color: #303133;
 }
 
 /* 内容区域 */
@@ -680,27 +590,6 @@ export default {
 /* 个人信息卡片 */
 .info-card {
   margin-bottom: 20px;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.card-header {
-  padding-bottom: 15px;
-  margin-bottom: 15px;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.card-header h3 {
-  margin: 0;
-  font-size: 18px;
-  color: #303133;
-  display: flex;
-  align-items: center;
-}
-
-.card-header i {
-  margin-right: 8px;
-  color: #409EFF;
 }
 
 .info-header {
@@ -710,9 +599,6 @@ export default {
 
 .avatar-section {
   margin-right: 30px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 
 .avatar-section .avatar {
@@ -720,19 +606,12 @@ export default {
   height: 100px;
   border-radius: 50%;
   overflow: hidden;
-  margin-bottom: 10px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  border: 3px solid #fff;
 }
 
 .avatar-section .avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.upload-avatar {
-  margin-top: 5px;
 }
 
 .info-section {
@@ -750,21 +629,12 @@ export default {
 }
 
 .info-label {
-  color: #909399;
-  display: inline-flex;
-  align-items: center;
-}
-
-.info-label i {
-  margin-right: 5px;
-  font-size: 16px;
-  color: #409EFF;
+  color: #606266;
 }
 
 .info-value {
   font-weight: 500;
   color: #303133;
-  margin-left: 5px;
 }
 
 .edit-button-wrapper {
@@ -772,14 +642,12 @@ export default {
 }
 
 .edit-button {
-  padding: 9px 20px;
+  padding: 7px 15px;
 }
 
 /* 标签页和表格 */
 .tabs-card {
   margin-bottom: 20px;
-  border-radius: 8px;
-  overflow: hidden;
 }
 
 .meeting-table {
@@ -787,15 +655,9 @@ export default {
   margin-bottom: 20px;
 }
 
-.el-table th {
-  background-color: #f5f7fa;
-  color: #606266;
-  font-weight: 600;
-}
-
 .pagination-container {
   text-align: right;
-  padding: 15px 0;
+  padding: 10px 0;
 }
 
 /* 弹窗样式 */
@@ -806,212 +668,5 @@ export default {
 
 .el-form-item {
   margin-bottom: 22px;
-}
-
-/* 响应式调整 */
-@media (max-width: 768px) {
-  .info-header {
-    flex-direction: column;
-  }
-  
-  .avatar-section {
-    margin-right: 0;
-    margin-bottom: 20px;
-  }
-  
-  .info-row {
-    flex-direction: column;
-  }
-  
-  .info-item {
-    margin-right: 0;
-    margin-bottom: 10px;
-  }
-  
-  .edit-button-wrapper {
-    margin-left: 0;
-    margin-top: 20px;
-  }
-}
-
-/* Mac风格弹窗样式 */
-.mac-style-dialog {
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.dialog-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-}
-
-.dialog-title h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 500;
-  color: #303133;
-}
-
-.mac-window-controls {
-  display: flex;
-  gap: 8px;
-}
-
-.mac-close-button,
-.mac-minimize-button,
-.mac-maximize-button {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: none;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.mac-close-button {
-  background-color: #ff5f56;
-}
-
-.mac-minimize-button {
-  background-color: #ffbd2e;
-}
-
-.mac-maximize-button {
-  background-color: #27c93f;
-}
-
-.mac-close-button:hover {
-  background-color: #ff3026;
-}
-
-.mac-minimize-button:hover {
-  background-color: #ffac00;
-}
-
-.mac-maximize-button:hover {
-  background-color: #1aab2f;
-}
-
-.mac-close-button:hover .mac-close-icon,
-.mac-minimize-button:hover .mac-minimize-icon,
-.mac-maximize-button:hover .mac-maximize-icon {
-  opacity: 1;
-}
-
-.mac-close-icon,
-.mac-minimize-icon,
-.mac-maximize-icon {
-  opacity: 0;
-  position: relative;
-  width: 8px;
-  height: 8px;
-}
-
-.mac-close-icon:before,
-.mac-close-icon:after {
-  content: '';
-  position: absolute;
-  width: 8px;
-  height: 1px;
-  background-color: rgba(0, 0, 0, 0.5);
-  top: 3.5px;
-  left: 0;
-}
-
-.mac-close-icon:before {
-  transform: rotate(45deg);
-}
-
-.mac-close-icon:after {
-  transform: rotate(-45deg);
-}
-
-.mac-minimize-icon:before {
-  content: '';
-  position: absolute;
-  width: 8px;
-  height: 1px;
-  background-color: rgba(0, 0, 0, 0.5);
-  top: 3.5px;
-  left: 0;
-}
-
-.mac-maximize-icon:before {
-  content: '';
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.5);
-  top: 0;
-  left: 0;
-}
-
-.header-placeholder {
-  width: 36px; /* 与mac-window-controls宽度保持一致 */
-}
-
-/* 弹窗底部按钮样式 */
-.buttons-container {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.dialog-btn {
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: none;
-  font-size: 14px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  transition: all 0.3s;
-  margin-left: 10px;
-}
-
-.dialog-btn i {
-  font-size: 14px;
-}
-
-.cancel-btn {
-  background-color: #f5f7fa;
-  color: #606266;
-  border: 1px solid #dcdfe6;
-}
-
-.cancel-btn:hover {
-  background-color: #e6e8eb;
-  color: #303133;
-}
-
-.submit-btn {
-  background-color: #409EFF;
-  color: white;
-}
-
-.submit-btn:hover {
-  background-color: #66b1ff;
-}
-
-.warning-btn {
-  background-color: #F39C12;
-  color: white;
-}
-
-.warning-btn:hover {
-  background-color: #F5B041;
-}
-
-.dialog-btn:disabled {
-  background-color: #f5f7fa;
-  color: #c0c4cc;
-  cursor: not-allowed;
 }
 </style> 

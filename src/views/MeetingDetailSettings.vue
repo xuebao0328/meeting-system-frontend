@@ -75,7 +75,14 @@
           </div>
           <div class="user-profile">
             <img src="../assets/avatar.png" alt="Avatar" class="avatar" />
-            <span class="username">管理员</span>
+            <span class="username">{{ username }}</span>
+            <el-dropdown trigger="click">
+              <i class="el-icon-arrow-down el-icon--right" style="cursor: pointer;"></i>
+              <el-dropdown-menu slot="dropdown">
+                <el-dropdown-item @click.native="goToUserCenter">个人中心</el-dropdown-item>
+                <el-dropdown-item @click.native="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </el-dropdown>
           </div>
         </div>
       </header>
@@ -1712,6 +1719,8 @@
 <script>
 // 导入echarts库
 import * as echarts from 'echarts';
+// 在script部分导入auth.js中的logout方法
+import { logout } from '@/api/auth';
 
 export default {
   name: 'MeetingDetailSettings',
@@ -2269,6 +2278,7 @@ export default {
         { id: 7, name: '分会场报告申请', type: 'radio', required: true, order: 7, isBasic: true }
       ],
       tempFieldType: '', // 临时存储字段类型
+      username: '管理员', // 默认值
     };
   },
   computed: {
@@ -2378,16 +2388,8 @@ export default {
       window.open(`/preview-website/${this.meetingId}`, '_blank');
     },
     toggleWebsiteStatus() {
-      if (this.meetingData.websiteStatus === 'active') {
-        // 下线网站
-        this.meetingData.websiteStatus = 'draft';
-        this.$message.success('网站已下线');
-      } else {
-        // 发布网站
-        this.meetingData.websiteStatus = 'active';
-        this.meetingData.websiteLastUpdate = new Date().toLocaleString();
-        this.$message.success('网站已发布');
-      }
+      this.meetingData.websiteStatus = this.meetingData.websiteStatus === 'active' ? 'draft' : 'active';
+      this.$message.success(this.meetingData.websiteStatus === 'active' ? '网站已成功发布！' : '网站已下线！');
     },
     fetchMeetingDetails() {
       // 模拟从 API 获取会议详情
@@ -3513,6 +3515,29 @@ export default {
       
       return typeMap[type] || type;
     },
+    goToUserCenter() {
+      this.$router.push('/user-center');
+    },
+    logout() {
+      logout(); // 调用API中的logout方法清除token
+      this.$message.success('退出登录成功');
+      this.$router.push('/login'); // 跳转到登录页
+    },
+    fetchUserInfo() {
+      try {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          this.username = user.username || '管理员';
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+      }
+    },
+  },
+  created() {
+    this.fetchUserInfo();
+    this.fetchMeetingDetails();
   },
 };
 </script>

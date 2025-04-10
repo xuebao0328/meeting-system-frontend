@@ -2,8 +2,9 @@ import axios from 'axios';
 
 // 创建 axios 实例
 const api = axios.create({
-  baseURL: 'http://localhost:8080/api/auth',
+  baseURL: 'http://localhost:8088/api',
   timeout: 10000,
+  withCredentials: false, // 不发送凭证
   headers: {
     'Content-Type': 'application/json'
   }
@@ -41,7 +42,7 @@ api.interceptors.response.use(
           console.error('没有权限访问该资源');
           break;
         default:
-          console.error('服务器错误');
+          console.error('请求错误: ', error.response.data);
       }
     }
     return Promise.reject(error);
@@ -54,15 +55,15 @@ export const login = (data) => {
   
   // 根据不同的登录方式调用不同的接口
   if (loginMethod === 'phone') {
-    return api.post('/login', {
+    return api.post('/auth/login', {
       loginMethod: 'phone',
       phone: loginData.phone,
       verificationCode: loginData.verificationCode
     });
   } else {
-    return api.post('/login', {
+    return api.post('/auth/login', {
       loginMethod: 'account',
-      username: loginData.username,
+      account: loginData.account,
       password: loginData.password
     });
   }
@@ -73,13 +74,15 @@ export const register = (data) => {
   const { registerMode, ...registerData } = data;
   
   if (registerMode === 'phone') {
-    return api.post('/register', {
-      phone: registerData.account,
+    return api.post('/auth/register', {
+      registerMode: 'phone',
+      account: registerData.phone,
       verificationCode: registerData.verificationCode
     });
   } else {
-    return api.post('/register', {
-      email: registerData.account,
+    return api.post('/auth/register', {
+      registerMode: 'email',
+      account: registerData.email,
       password: registerData.password
     });
   }
@@ -87,7 +90,7 @@ export const register = (data) => {
 
 // 发送验证码
 export const sendVerificationCode = (phone) => {
-  return api.post('/send-code', { phone });
+  return api.post('/auth/send-code', { phone });
 };
 
 // 验证用户 token

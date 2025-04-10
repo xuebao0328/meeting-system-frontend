@@ -55,7 +55,12 @@
               <div class="input-icon">
                 <span class="user-icon">👤</span>
               </div>
-              <input type="text" placeholder="用户名/手机号/邮箱" v-model="loginForm.username" />
+              <input 
+                type="text" 
+                placeholder="用户名/邮箱/手机号" 
+                v-model="loginForm.account" 
+                @keyup.enter="loginAction"
+              />
             </div>
           </div>
 
@@ -64,7 +69,12 @@
               <div class="input-icon">
                 <span class="lock-icon">🔒</span>
               </div>
-              <input type="password" placeholder="请输入密码" v-model="loginForm.password" />
+              <input 
+                type="password" 
+                placeholder="密码" 
+                v-model="loginForm.password" 
+                @keyup.enter="loginAction"
+              />
             </div>
           </div>
         </template>
@@ -192,7 +202,20 @@
             <div class="input-icon">
               <span class="lock-icon">🔒</span>
             </div>
-            <input type="password" placeholder="请输入密码" v-model="registerForm.password" />
+            <input type="password" placeholder="请设置密码" v-model="registerForm.password" minlength="6" />
+          </div>
+        </div>
+
+        <div class="input-container" v-if="registerMode === 'email'">
+          <div class="input-wrapper">
+            <div class="input-icon">
+              <span class="lock-icon">🔒</span>
+            </div>
+            <input type="password" placeholder="请确认密码" v-model="registerForm.confirmPassword" minlength="6" />
+          </div>
+          <div class="password-hint" v-if="registerForm.password">
+            <p :class="{ valid: passwordValid }">密码长度至少6位</p>
+            <p :class="{ valid: passwordsMatch }">两次密码输入一致</p>
           </div>
         </div>
 
@@ -221,14 +244,22 @@
       </div>
     </div>
 
-    <!-- 成功提示框 -->
-    <div v-if="showSuccessModal" class="success-modal-overlay">
-      <div class="success-modal">
-        <div class="success-icon">✓</div>
-        <h3>{{ successMessage }}</h3>
-        <button class="confirm-button" @click="handleSuccessConfirm">确定</button>
+    <!-- 注册成功弹窗 -->
+    <el-dialog
+      :visible.sync="showSuccessDialog"
+      width="30%"
+      :show-close="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      custom-class="success-dialog"
+    >
+      <div class="success-content">
+        <i class="el-icon-success success-icon"></i>
+        <h3>注册成功！</h3>
+        <p>欢迎加入学路达会议服务系统</p>
+        <p class="redirect-text">正在为您跳转到首页...</p>
       </div>
-    </div>
+    </el-dialog>
 
     <!-- 添加提示框 -->
     <div v-if="showTip" class="tip-message">
@@ -605,6 +636,8 @@
 </template>
 
 <script>
+import { login, register, sendVerificationCode } from '@/api/auth';
+
 export default {
   name: 'HomePage',
   data() {
@@ -614,8 +647,9 @@ export default {
       showLoginModal: false,
       showRegisterModal: false,
       showSuccessModal: false,
+      showSuccessDialog: false,
       loginForm: {
-        username: '',
+        account: '',
         password: '',
         phone: '',
         verificationCode: '',
@@ -626,6 +660,7 @@ export default {
       registerForm: {
         account: '',
         password: '',
+        confirmPassword: '',
         verificationCode: ''
       },
       loginError: '',
@@ -726,7 +761,7 @@ export default {
     // 检查是否有记住的账号
     const rememberedAccount = localStorage.getItem('rememberedAccount');
     if (rememberedAccount) {
-      this.loginForm.username = rememberedAccount;
+      this.loginForm.account = rememberedAccount;  // 使用account字段
       this.rememberMe = true;
     }
   },
@@ -743,100 +778,215 @@ export default {
       document.documentElement.setAttribute('data-theme', this.isDarkTheme ? 'dark' : 'light');
     },
     loginAction() {
-      if (this.loginMethod === 'account') {
-        if (!this.loginForm.username || !this.loginForm.password) {
-          this.loginError = '用户名和密码不能为空';
-          this.hideErrorAfterDelay('loginError');
+      try {
+        this.loginError = '';
+        
+        // 表单验证
+        if (this.loginMethod === 'account' && (!this.loginForm.account || !this.loginForm.password)) {
+          this.loginError = '请填写完整的登录信息';
           return;
         }
 
-        // 超级管理员账号判断
-        if (this.loginForm.username === 'superadmin' && this.loginForm.password === 'superadmin') {
+        if (this.loginMethod === 'phone' && (!this.loginForm.phone || !this.loginForm.verificationCode)) {
+          this.loginError = '请填写完整的手机号和验证码';
+          return;
+        }
+        
+        // 根据登录方式构造请求参数
+        const loginData = {
+          loginMethod: this.loginMethod
+        };
+        
+        if (this.loginMethod === 'account') {
+          loginData.account = this.loginForm.account;
+          loginData.password = this.loginForm.password;
+        } else if (this.loginMethod === 'phone') {
+          loginData.phone = this.loginForm.phone;
+          loginData.verificationCode = this.loginForm.verificationCode;
+        }
+        
+        // 调用登录API
+        login(loginData).then(response => {
+          // 保存token和用户信息
+          const { token, user } = response;
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify(user));
+          
+          // 登录成功，显示成功动画
           this.showConfetti = true;
+          
+          // 3秒后跳转到会议管理页面
           setTimeout(() => {
             this.showLoginModal = false;
-            this.$router.push('/super-admin');
-          }, 800);
-          return;
-        }
-        
-        // 模拟账号登录验证
-        if (this.loginForm.username === 'admin' && this.loginForm.password === 'admin') {
-          this.loginSuccess();
-        } else {
-          this.loginError = '用户名或密码错误';
-          this.hideErrorAfterDelay('loginError');
-        }
-      } else if (this.loginMethod === 'phone') {
-        if (!this.loginForm.phone || !this.loginForm.verificationCode) {
-          this.loginError = '手机号和验证码不能为空';
-          this.hideErrorAfterDelay('loginError');
-          return;
-        }
-        
-        // 模拟验证码登录验证
-        if (this.loginForm.phone === '13800138000' && this.loginForm.verificationCode === '1234') {
-          this.loginSuccess();
-        } else {
-          this.loginError = '手机号或验证码错误';
-          this.hideErrorAfterDelay('loginError');
-        }
-      } else if (this.loginMethod === 'subAccount') {
-        if (!this.loginForm.masterAccount || !this.loginForm.subAccount || !this.loginForm.authToken) {
-          this.loginError = '主账号、子账号和授权口令不能为空';
-          this.hideErrorAfterDelay('loginError');
-          return;
-        }
-        
-        // 模拟子账号登录验证
-        if (this.loginForm.masterAccount === 'master' && 
-            this.loginForm.subAccount === 'subadmin' && 
-            this.loginForm.authToken === 'auth123') {
-          this.loginSuccess();
-        } else {
-          this.loginError = '子账号信息或授权口令错误';
-          this.hideErrorAfterDelay('loginError');
-        }
-      }
-      
-      // 记住登录状态
-      if (this.rememberMe) {
-        localStorage.setItem('rememberedAccount', this.loginForm.username || this.loginForm.phone || this.loginForm.masterAccount);
-      } else {
-        localStorage.removeItem('rememberedAccount');
+            this.showConfetti = false;
+            this.$router.push('/admin-center');
+          }, 2000);
+        }).catch(error => {
+          this.loginError = error.message || '登录失败，请检查您的信息';
+          console.error('登录错误:', error);
+        });
+      } catch (error) {
+        this.loginError = error.message || '登录失败，请检查您的信息';
+        console.error('登录错误:', error);
       }
     },
-    registerAction() {
+    
+    // 发送登录验证码
+    getLoginCode() {
+      if (this.loginCountDown > 0) return;
+      
+      if (!this.loginForm.phone) {
+        this.loginError = '请输入手机号';
+          return;
+        }
+        
+      sendVerificationCode(this.loginForm.phone).then(() => {
+        // 开始倒计时
+        this.loginCountDown = 60;
+        const timer = setInterval(() => {
+          this.loginCountDown--;
+          if (this.loginCountDown <= 0) {
+            clearInterval(timer);
+          }
+        }, 1000);
+      }).catch(error => {
+        this.loginError = error.message || '验证码发送失败';
+        console.error('验证码发送错误:', error);
+      });
+    },
+    
+    // 注册操作
+    registerAction: async function() {
       if (!this.agreedToTerms) {
-        this.registerError = '请先阅读并同意服务条款和隐私协议';
-        this.hideErrorAfterDelay('registerError');
+        this.showTip = true;
+        this.tipMessage = "请先阅读并同意服务条款和隐私协议";
+        setTimeout(() => {
+          this.showTip = false;
+        }, 2000);
+          return;
+        }
+        
+      try {
+        if (this.registerMode === 'phone') {
+          // 手机注册逻辑
+          await this.registerWithPhone();
+        } else {
+          // 邮箱注册逻辑
+          await this.registerWithEmail();
+        }
+      } catch (error) {
+        console.error('注册失败:', error);
+        this.registerError = error.message || '注册失败，请稍后重试';
+      }
+    },
+    
+    // 添加手机注册方法
+    registerWithPhone: async function() {
+      // 表单验证
+      if (!this.registerForm.account) {
+        this.registerError = '请输入手机号';
         return;
       }
       
-      if (this.registerMode === 'phone') {
-        if (!this.registerForm.account || !this.registerForm.verificationCode) {
-          this.registerError = '手机号和验证码不能为空';
-          this.hideErrorAfterDelay('registerError');
-          return;
-        }
-      } else {
-        if (!this.registerForm.account || !this.registerForm.password) {
-          this.registerError = '邮箱和密码不能为空';
-          this.hideErrorAfterDelay('registerError');
-          return;
-        }
+      if (!this.registerForm.verificationCode) {
+        this.registerError = '请输入验证码';
+        return;
       }
       
-      // 模拟注册成功
-      this.showRegisterModal = false;
-      this.showSuccessModal = true;
-      this.successMessage = '注册成功';
+      // 调用注册API
+      const registerData = {
+        registerMode: 'phone',
+        phone: this.registerForm.account,
+        verificationCode: this.registerForm.verificationCode
+      };
+      
+      const response = await register(registerData);
+      this.handleRegisterSuccess(response);
     },
+    
+    // 添加邮箱注册方法
+    registerWithEmail: async function() {
+      // 表单验证
+      if (!this.registerForm.account) {
+        this.registerError = '请输入邮箱';
+        return;
+      }
+      
+      if (!this.registerForm.password) {
+        this.registerError = '请设置密码';
+          return;
+        }
+      
+      if (!this.passwordValid()) {
+        this.registerError = '密码长度至少为6位';
+          return;
+        }
+      
+      if (!this.passwordsMatch()) {
+        this.registerError = '两次输入的密码不一致';
+        return;
+      }
+      
+      // 调用注册API
+      const registerData = {
+        registerMode: 'email',
+        email: this.registerForm.account,
+        password: this.registerForm.password
+      };
+      
+      const response = await register(registerData);
+      this.handleRegisterSuccess(response);
+    },
+    
+    // 处理注册成功响应
+    handleRegisterSuccess: function(response) {
+      // 保存token和用户信息
+      if (response && response.token) {
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+      }
+      
+      // 显示注册成功弹窗
+      this.showRegisterModal = false;
+      this.showSuccessDialog = true;
+      
+      // 3秒后跳转到管理中心
+      setTimeout(() => {
+        this.showSuccessDialog = false;
+        this.$router.push('/admin-center');
+      }, 3000);
+    },
+    
+    // 发送注册验证码
+    getRegisterCode() {
+      if (this.registerCountDown > 0) return;
+      
+        if (!this.registerForm.account) {
+        this.registerError = '请输入手机号';
+        return;
+      }
+      
+      sendVerificationCode(this.registerForm.account).then(() => {
+        // 开始倒计时
+        this.registerCountDown = 60;
+      const timer = setInterval(() => {
+        this.registerCountDown--;
+        if (this.registerCountDown <= 0) {
+          clearInterval(timer);
+        }
+      }, 1000);
+      }).catch(error => {
+        this.registerError = error.message || '验证码发送失败';
+        console.error('验证码发送错误:', error);
+      });
+    },
+
     hideErrorAfterDelay(errorType) {
       setTimeout(() => {
         this[errorType] = '';
       }, 3000);
     },
+
     loginSuccess() {
       this.showConfetti = true;
       setTimeout(() => {
@@ -844,45 +994,10 @@ export default {
         this.$router.push('/admin-center');
       }, 800);
     },
-    getLoginCode() {
-      if (this.loginCountDown > 0 || !this.loginForm.phone) {
-        if (!this.loginForm.phone) {
-          this.loginError = '请先输入手机号';
-          this.hideErrorAfterDelay('loginError');
-        }
-        return;
-      }
-      
-      // 模拟发送验证码
-      this.loginCountDown = 25;
-      const timer = setInterval(() => {
-        this.loginCountDown--;
-        if (this.loginCountDown <= 0) {
-          clearInterval(timer);
-        }
-      }, 1000);
-    },
-    getRegisterCode() {
-      if (this.registerCountDown > 0 || !this.registerForm.account) {
-        if (!this.registerForm.account) {
-          this.registerError = '请先输入手机号';
-          this.hideErrorAfterDelay('registerError');
-        }
-        return;
-      }
-      
-      // 模拟发送验证码
-      this.registerCountDown = 25;
-      const timer = setInterval(() => {
-        this.registerCountDown--;
-        if (this.registerCountDown <= 0) {
-          clearInterval(timer);
-        }
-      }, 1000);
-    },
+
     clearLoginForm() {
       this.loginForm = {
-        username: '',
+        account: '',
         password: '',
         phone: '',
         verificationCode: '',
@@ -897,6 +1012,7 @@ export default {
       this.registerForm = {
         account: '',
         password: '',
+        confirmPassword: '',
         verificationCode: ''
       };
       this.registerError = '';
@@ -952,6 +1068,21 @@ export default {
         this.showTip = false;
       }, 3000);
     },
+    passwordValid() {
+      return this.registerForm.password && this.registerForm.password.length >= 6;
+    },
+    passwordsMatch() {
+      return this.registerForm.password && this.registerForm.password === this.registerForm.confirmPassword;
+    },
+    resetRegisterForm() {
+      this.registerForm = {
+        account: '',
+        password: '',
+        confirmPassword: '',
+        verificationCode: ''
+      };
+      this.registerError = '';
+    }
   },
   watch: {
     showLoginModal(newVal) {
@@ -2194,5 +2325,64 @@ export default {
     opacity: 0;
     transform: translate(-50%, -20px);
   }
+}
+
+.password-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #999;
+  padding-left: 10px;
+}
+
+.password-hint p {
+  margin: 4px 0;
+  display: flex;
+  align-items: center;
+}
+
+.password-hint p::before {
+  content: "•";
+  margin-right: 4px;
+}
+
+.password-hint p.valid {
+  color: #67C23A;
+}
+
+.password-hint p.valid::before {
+  content: "✓";
+  color: #67C23A;
+}
+
+.success-dialog {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.success-content {
+  text-align: center;
+  padding: 20px;
+}
+
+.success-icon {
+  font-size: 48px;
+  color: #67C23A;
+  margin-bottom: 20px;
+}
+
+.success-content h3 {
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.success-content p {
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.redirect-text {
+  color: #999;
+  font-size: 14px;
 }
 </style>

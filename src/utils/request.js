@@ -5,7 +5,7 @@ import { getToken } from '@/utils/auth'
 
 // create an axios instance
 const service = axios.create({
-  baseURL: "http://47.109.202.157:6368",
+  baseURL: "http://localhost:8088",
   timeout: 3600000,
 });
 
@@ -13,7 +13,7 @@ service.interceptors.request.use(
   config => {
     
     if (store.getters.token) {
-      config.headers["Authorization"] = getToken()
+      config.headers["Authorization"] = `Bearer ${getToken()}`
     }
     return config
   },

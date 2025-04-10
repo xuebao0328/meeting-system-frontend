@@ -30,7 +30,14 @@
           </div>
           <div class="user-profile">
             <img src="path/to/avatar.png" alt="Avatar" class="avatar" />
-            <span class="username" @click="goToUserCenter" style="cursor: pointer;">管理员</span>
+            <span class="username" @click="goToUserCenter" style="cursor: pointer;">{{ username }}</span>
+            <el-dropdown trigger="click">
+              <i class="el-icon-arrow-down el-icon--right" style="cursor: pointer;"></i>
+              <el-dropdown-menu slot="dropdown">
+                <el-dropdown-item @click.native="goToUserCenter">个人中心</el-dropdown-item>
+                <el-dropdown-item @click.native="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </el-dropdown>
           </div>
         </div>
       </header>
@@ -73,19 +80,24 @@
 
           <!-- 会议卡片区域 -->
           <div class="meetings-table-container">
-            <div v-if="filteredMeetings.length === 0" class="empty-state">
+            <div v-if="loading" class="loading-container">
+              <i class="el-icon-loading"></i>
+              <p>加载会议数据中...</p>
+            </div>
+            <div v-else-if="filteredMeetings.length === 0" class="empty-state">
               <div class="empty-icon">📅</div>
-              <p>暂无符合条件的会议</p>
+              <p>{{ meetingSearch || meetingStatusFilter || meetingDateFilter ? '暂无符合条件的会议' : '暂无会议数据，点击"创建新会议"添加' }}</p>
             </div>
             <table v-else class="meetings-table">
               <thead>
                 <tr>
                   <th width="20%">会议信息</th>
-                  <th width="12%">会议类型</th>
+                  <th width="10%">会议类型</th>
                   <th width="15%">时间</th>
-                  <th width="15%">地点</th>
-                  <th width="12%">状态</th>
-                  <th width="10%">参会人数</th>
+                  <th width="10%">地点</th>
+                  <th width="10%">状态</th>
+                  <th width="10%">负责人</th>
+                  <th width="8%">参会人数</th>
                   <th width="8%">分会场数量</th>
                   <th width="8%">操作</th>
                 </tr>
@@ -95,11 +107,13 @@
                   <td>
                     <div class="meeting-name-cell">
                       <i class="el-icon-document"></i>
+                      <div class="meeting-name-content">
                       <span class="meeting-title">{{ meeting.title }}</span>
-                      <div class="meeting-info-row">
-                        <span v-if="meeting.description" class="meeting-description-preview">
-                          {{ meeting.description.substring(0, 30) }}...
+                        <div class="meeting-info-row" v-if="meeting.description">
+                          <span class="meeting-description-preview">
+                            {{ meeting.description.substring(0, 50) }}{{ meeting.description.length > 50 ? '...' : '' }}
                         </span>
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -126,6 +140,12 @@
                     </span>
                   </td>
                   <td>
+                    <span class="meeting-manager">
+                      <i class="el-icon-user"></i>
+                      {{ meeting.manager || '未指定' }}
+                    </span>
+                  </td>
+                  <td>
                     <span class="meeting-attendees">
                       <i class="el-icon-user"></i>
                       {{ meeting.attendees || 0 }}
@@ -138,14 +158,17 @@
                   </td>
                   <td>
                     <div class="table-actions">
-                      <button class="action-button" @click="editMeeting(meeting)" title="编辑">
+                      <button class="action-button edit-button" @click="editMeeting(meeting)" title="编辑">
                         <i class="el-icon-edit"></i>
                       </button>
-                      <button class="action-button" @click="viewMeetingDetail(meeting)" title="查看">
+                      <button class="action-button view-button" @click="viewMeetingDetail(meeting)" title="查看">
                         <i class="el-icon-view"></i>
                       </button>
-                      <button class="action-button" @click="goToMeetingSettings(meeting)" title="设置">
+                      <button class="action-button settings-button" @click="goToMeetingSettings(meeting)" title="设置">
                         <i class="el-icon-setting"></i>
+                      </button>
+                      <button class="action-button delete-button" @click="confirmDeleteMeeting(meeting)" title="删除">
+                        <i class="el-icon-delete"></i>
                       </button>
                     </div>
                   </td>
@@ -156,102 +179,220 @@
         </div>
 
         <!-- 创建会议弹窗 -->
-        <div v-if="showCreateMeetingModal" class="modal-overlay" @click="showCreateMeetingModal = false">
-          <div class="modal" @click.stop>
+        <div v-if="showCreateMeetingModal" class="modal-overlay" @click.self="showCreateMeetingModal = false">
+          <div class="modal create-meeting-modal" @click.stop>
             <div class="modal-header">
-              <h3>创建新会议</h3>
-              <button class="close-button" @click="showCreateMeetingModal = false">
-                <i class="el-icon-close"></i>
+              <div class="mac-window-controls">
+                <button class="mac-close-button" @click="showCreateMeetingModal = false" title="关闭">
+                  <span class="mac-close-icon"></span>
+                </button>
+                <button class="mac-minimize-button" title="最小化">
+                  <span class="mac-minimize-icon"></span>
+                </button>
+                <button class="mac-maximize-button" title="最大化">
+                  <span class="mac-maximize-icon"></span>
               </button>
             </div>
+              <h3>创建新会议</h3>
+              <div class="header-placeholder"></div>
+            </div>
+            
             <div class="modal-body">
               <!-- 基本信息 -->
-              <div class="form-section">
-                <h4>基本信息</h4>
+              <div class="form-card">
+                <div class="form-card-header">
+                  <div class="form-card-title">
+                    <i class="el-icon-document"></i>
+                    <span>基本信息</span>
+                  </div>
+                </div>
+                
+                <div class="form-card-body">
                 <div class="form-row">
-                  <div class="form-group half">
-                    <label>会议名称 <i class="el-icon-info" title="请输入会议的完整名称"></i></label>
+                    <div class="form-group full">
+                      <label>会议名称 <span class="required-mark">*</span></label>
                     <div class="input-with-icon">
                       <i class="el-icon-document"></i>
-                      <input type="text" v-model="newMeeting.title" placeholder="请输入会议名称" @input="validateTitle">
+                        <input type="text" v-model.trim="newMeeting.title" placeholder="请输入会议名称" @input="validateTitle">
                     </div>
                     <span v-if="titleError" class="error-message">{{ titleError }}</span>
                   </div>
+                  </div>
+                  
+                  <div class="form-section-divider"></div>
+                  
+                  <div class="form-row">
                   <div class="form-group half">
-                    <label>会议类型 <i class="el-icon-info" title="选择会议的类型"></i></label>
+                      <label>会议类型 <span class="required-mark">*</span></label>
+                      <div class="select-with-icon">
+                        <i class="el-icon-menu"></i>
                     <select v-model="newMeeting.type">
-                      <option value="offline">线下会议</option>
-                      <option value="online">线上会议</option>
-                      <option value="hybrid">混合会议</option>
+                          <option value="domestic">国内会议</option>
+                          <option value="international">国际会议</option>
+                          <option value="both">国内、国际会议</option>
                     </select>
+                      </div>
+                    </div>
+                    <div class="form-group half">
+                      <label>会议状态 <span class="required-mark">*</span></label>
+                      <div class="select-with-icon">
+                        <i class="el-icon-time"></i>
+                        <select v-model="newMeeting.status">
+                          <option value="preparing">筹备中</option>
+                          <option value="ongoing">进行中</option>
+                          <option value="finished">已结束</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="form-section-divider"></div>
+                  
+                  <div class="form-row">
+                    <div class="form-group full">
+                      <label>会议负责人 <span class="required-mark">*</span></label>
+                      <div class="input-with-icon">
+                        <i class="el-icon-user"></i>
+                        <input type="text" v-model="newMeeting.manager" placeholder="请输入会议负责人姓名" @input="validateManager">
+                      </div>
+                      <span v-if="managerError" class="error-message">{{ managerError }}</span>
+                    </div>
+                  </div>
+                  
+                  <div class="form-row">
+                    <div class="form-group full">
+                      <label>会议描述</label>
+                      <div class="textarea-with-count">
+                        <textarea 
+                          v-model="newMeeting.description" 
+                          placeholder="请简要描述会议内容、目的和亮点"
+                          rows="3"
+                        ></textarea>
+                        <div class="char-count">{{ newMeeting.description ? newMeeting.description.length : 0 }}/500</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <!-- 时间地点 -->
-              <div class="form-section">
-                <h4>时间地点</h4>
+              <div class="form-card">
+                <div class="form-card-header">
+                  <div class="form-card-title">
+                    <i class="el-icon-date"></i>
+                    <span>时间地点</span>
+                  </div>
+                </div>
+                
+                <div class="form-card-body">
                 <div class="form-row">
                   <div class="form-group half">
-                    <label>会议开始时间 <i class="el-icon-info" title="选择会议的开始时间"></i></label>
+                      <label>会议开始时间 <span class="required-mark">*</span></label>
+                      <div class="date-picker-wrapper">
                     <el-date-picker
                       v-model="newMeeting.startTime"
                       type="datetime"
                       placeholder="选择开始时间"
+                          value-format="yyyy-MM-dd HH:mm:ss"
+                          @change="validateStartTime"
                       :picker-options="pickerOptions"
-                    />
+                          style="width: 100%">
+                        </el-date-picker>
+                      </div>
                     <span v-if="startTimeError" class="error-message">{{ startTimeError }}</span>
                   </div>
                   <div class="form-group half">
-                    <label>会议结束时间 <i class="el-icon-info" title="选择会议的结束时间"></i></label>
-                    <input type="datetime-local" v-model="newMeeting.endTime" @input="validateEndTime">
+                      <label>会议结束时间 <span class="required-mark">*</span></label>
+                      <div class="date-picker-wrapper">
+                        <el-date-picker
+                          v-model="newMeeting.endTime"
+                          type="datetime"
+                          placeholder="选择结束时间"
+                          value-format="yyyy-MM-dd HH:mm:ss"
+                          @change="validateEndTime"
+                          :picker-options="pickerOptions"
+                          style="width: 100%">
+                        </el-date-picker>
+                      </div>
                     <span v-if="endTimeError" class="error-message">{{ endTimeError }}</span>
                   </div>
                 </div>
+                  
+                  <div class="form-section-divider"></div>
+                  
                 <div class="form-row">
                   <div class="form-group full">
-                    <label>会议地点 <i class="el-icon-info" title="输入会议的具体地点"></i></label>
+                      <label>会议地点 <span class="required-mark">*</span></label>
+                      <div class="input-with-icon">
+                        <i class="el-icon-location"></i>
                     <input type="text" v-model="newMeeting.location" placeholder="请输入会议地点" @input="validateLocation">
+                      </div>
                     <span v-if="locationError" class="error-message">{{ locationError }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <!-- 分会场设置 -->
-              <div class="form-section">
-                <h4>分会场设置</h4>
-                <div class="form-row">
-                  <div class="form-group full">
-                    <label>当前分会场数量: {{ newMeeting.subVenues.length }}</label>
-                    <div v-for="(venue, index) in newMeeting.subVenues" :key="index" class="sub-venue">
-                      <div class="form-row">
-                        <div class="form-group half">
-                          <label>分会场名称</label>
-                          <input type="text" v-model="venue.name" placeholder="请输入分会场名称">
+              <div class="form-card">
+                <div class="form-card-header">
+                  <div class="form-card-title">
+                    <i class="el-icon-office-building"></i>
+                    <span>分会场设置</span>
                         </div>
-                        <div class="form-group half">
-                          <label>分会场地点</label>
-                          <input type="text" v-model="venue.location" placeholder="请输入分会场地点">
+                  <button class="add-venue-button" @click="addSubVenue">
+                    <i class="el-icon-plus"></i> 添加分会场
+                  </button>
                         </div>
+                
+                <div class="form-card-body">
+                  <div v-if="newMeeting.subVenues.length === 0" class="empty-venues">
+                    <div class="empty-icon"><i class="el-icon-place"></i></div>
+                    <div class="empty-text">暂无分会场，点击"添加分会场"创建</div>
                       </div>
+                  
+                  <div v-else class="sub-venues-list">
+                    <div v-for="(venue, index) in newMeeting.subVenues" :key="index" class="sub-venue-card">
+                      <div class="venue-header">
+                        <div class="venue-title">分会场 #{{ index + 1 }}</div>
+                        <button class="venue-delete" @click="removeSubVenue(index)">
+                          <i class="el-icon-delete"></i>
+                        </button>
+                      </div>
+                      <div class="venue-content">
                       <div class="form-row">
                         <div class="form-group half">
-                          <label>会场人数</label>
-                          <input type="number" v-model="venue.capacity" placeholder="请输入会场人数">
+                            <label>分会场名称 <span class="required-mark">*</span></label>
+                            <div class="input-with-icon">
+                              <i class="el-icon-house"></i>
+                              <input type="text" v-model="venue.name" placeholder="请输入分会场名称">
+                            </div>
                         </div>
                         <div class="form-group half">
-                          <button class="action-button" @click="removeSubVenue(index)">删除分会场</button>
+                            <label>允许参加人数 <span class="required-mark">*</span></label>
+                            <div class="input-with-icon">
+                              <i class="el-icon-user"></i>
+                              <input type="number" min="1" v-model="venue.capacity" placeholder="请输入允许参加人数">
                         </div>
                       </div>
                     </div>
-                    <button class="primary-button" @click="addSubVenue">添加分会场</button>
                   </div>
                 </div>
               </div>
             </div>
+              </div>
+            </div>
+            
             <div class="modal-footer">
+              <div class="buttons-container">
+                <button class="draft-button" @click="saveDraft">
+                  <i class="el-icon-document-copy"></i> 保存草稿
+                </button>
               <button class="cancel-button" @click="showCreateMeetingModal = false">取消</button>
-              <button class="submit-button" @click="createMeeting">创建</button>
+                <button class="submit-button" @click="handleSubmit">
+                  创建会议 <i class="el-icon-check"></i>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -321,6 +462,9 @@
 </template>
 
 <script>
+import { getMeetings, createMeeting, updateMeeting, deleteMeeting, handleApiError } from '@/api/meeting';
+import { logout } from '@/api/auth';
+
 export default {
   name: 'AdminCenter',
   data() {
@@ -328,19 +472,23 @@ export default {
       activeMenu: 'meetings',
       unreadCount: 5,
       meetings: [],
+      loading: false,
       showCreateMeetingModal: false,
       meetingSearch: '',
       meetingStatusFilter: '',
       meetingDateFilter: '',
+      currentStep: 1,
+      username: '管理员',
       newMeeting: {
         title: '',
-        type: 'offline',
+        type: 'domestic',
+        status: 'preparing',
         startTime: '',
         endTime: '',
         location: '',
         description: '',
-        status: 'draft',
-        subVenues: []
+        manager: '',
+        subVenues: [],
       },
       notifications: [
         {
@@ -425,12 +573,14 @@ export default {
       ],
       tagInput: '',
       titleError: '',
-      timeError: '',
-      locationError: '',
       startTimeError: '',
       endTimeError: '',
+      locationError: '',
+      managerError: '',
       pickerOptions: {
-        // Add any necessary picker options here
+        disabledDate(time) {
+          return time.getTime() < Date.now() - 8.64e7;
+        }
       },
     }
   },
@@ -461,60 +611,74 @@ export default {
     }
   },
   created() {
+    this.fetchUserInfo();
     this.initMeetings();
   },
   methods: {
-    initMeetings() {
-      this.meetings = [
-        {
-          id: 1,
-          title: "2023年度技术研讨会",
-          type: "offline",
-          typeText: "线下会议",
-          startTime: "2023-12-15 09:00",
-          endTime: "2023-12-16 18:00",
-          location: "上海浦东会展中心",
-          description: "年度技术研讨与交流平台，探讨行业前沿技术和发展趋势。",
-          status: "upcoming",
-          statusText: "筹备中",
-          attendees: 120,
-          subVenues: [{ name: "主会场", location: "1号厅" }]
-        },
-        {
-          id: 2,
-          title: "产品发布会",
-          type: "hybrid",
-          typeText: "混合会议",
-          startTime: "2023-11-20 14:00",
-          endTime: "2023-11-20 17:30",
-          location: "北京国际会议中心",
-          description: "新一代产品发布会，展示最新技术成果和创新应用。",
-          status: "confirmed",
-          statusText: "已确认",
-          attendees: 80,
-          subVenues: [
-            { name: "主会场", location: "多功能厅" },
-            { name: "展示区", location: "展览大厅" }
-          ]
-        },
-        {
-          id: 3,
-          title: "在线学习论坛",
-          type: "online",
-          typeText: "线上会议",
-          startTime: "2023-10-05 10:00",
-          endTime: "2023-10-05 16:00",
-          location: "Zoom视频会议",
-          description: "探讨在线教育的未来与发展，分享最新学习方法和工具。",
-          status: "completed",
-          statusText: "已结束",
-          attendees: 200,
-          subVenues: []
+    fetchUserInfo() {
+      try {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          this.username = user.username || '管理员';
         }
-      ];
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+      }
+    },
+    initMeetings() {
+      this.loading = true;
+      // 添加时间戳参数以避免缓存
+      const params = {
+        timestamp: new Date().getTime()
+      };
+      
+      getMeetings(params)
+        .then(response => {
+          console.log('会议列表API响应:', response);
+          // 正确处理会议数据，兼容多种返回格式
+          let meetingsData = [];
+          if (response && Array.isArray(response.meetings)) {
+            meetingsData = response.meetings;
+          } else if (Array.isArray(response)) {
+            meetingsData = response;
+          } else if (response && response.code === 200 && Array.isArray(response.data)) {
+            meetingsData = response.data;
+          } else {
+            this.$message.error('获取会议列表失败：数据格式不正确');
+            console.error('无法解析会议数据:', response);
+            this.loading = false;
+            return;
+          }
+          
+          // 为每个会议添加类型文本和状态文本
+          this.meetings = meetingsData.map(meeting => {
+            return {
+              ...meeting,
+              typeText: this.getTypeText(meeting.type),
+              statusText: this.getStatusText(meeting.status)
+            };
+          });
+          
+          console.log('处理后的会议数据:', this.meetings);
+        })
+        .catch(error => {
+          this.$message.error(handleApiError(error) || '获取会议列表失败');
+          console.error('获取会议列表错误:', error);
+        })
+        .finally(() => {
+          this.loading = false;
+        });
     },
     editMeeting(meeting) {
-      this.newMeeting = { ...meeting };
+      // 深拷贝会议对象，避免直接修改列表中的数据
+      this.newMeeting = JSON.parse(JSON.stringify(meeting));
+      
+      // 确保会议对象中的subVenues字段是数组
+      if (!this.newMeeting.subVenues) {
+        this.newMeeting.subVenues = [];
+      }
+      
       this.showCreateMeetingModal = true;
     },
     toggleMeetingExpand(meeting) {
@@ -532,36 +696,61 @@ export default {
         params: { id: meeting.id }
       });
     },
-    async createMeeting() {
-      if (!this.validateForm()) return;
-
-      this.loading = true;
-      try {
-        await api.createMeeting(this.newMeeting);
+    handleSubmit() {
+      if (this.validateForm()) {
+        // 构建要提交的会议数据
+        const meetingData = { ...this.newMeeting };
+        
+        // 显示加载中状态
+        const loading = this.$loading({
+          lock: true,
+          text: '创建会议中...',
+          spinner: 'el-icon-loading',
+          background: 'rgba(0, 0, 0, 0.7)'
+        });
+        
+        // 调用API创建新会议
+        createMeeting(meetingData)
+          .then(response => {
+            console.log('创建会议API响应:', response);
+            // 修改判断条件，兼容多种响应格式
+            if (response && (response.code === 200 || response.id || (typeof response === 'object' && !response.error))) {
         this.$message.success('会议创建成功');
-        this.showCreateMeetingModal = false;
-        this.resetForm();
-      } catch (error) {
-        this.$message.error('会议创建失败，请重试');
-      } finally {
-        this.loading = false;
+              this.closeModal();
+              this.initMeetings(); // 修改为正确的刷新方法名
+            } else {
+              this.$message.error(response && response.msg ? response.msg : '创建会议失败');
+              console.error('会议创建失败:', response);
+            }
+          })
+          .catch(error => {
+            console.error('会议创建错误:', error);
+            this.$message.error(handleApiError(error) || '创建会议失败，请稍后重试');
+          })
+          .finally(() => {
+            loading.close();
+          });
       }
     },
     resetForm() {
       this.newMeeting = {
         title: '',
-        time: '',
-        location: '',
-        description: '',
-        status: 'upcoming',
-        type: 'offline',
-        url: '',
-        tags: [],
-        subVenues: [],
+        type: 'domestic',
+        status: 'preparing',
         startTime: '',
         endTime: '',
+        location: '',
+        description: '',
+        manager: '',
+        subVenues: [],
       };
-      this.tagInput = '';
+      this.titleError = '';
+      this.startTimeError = '';
+      this.endTimeError = '';
+      this.locationError = '';
+      this.managerError = '';
+      
+      console.log('表单已重置，newMeeting:', this.newMeeting);
     },
     addTag() {
       if (this.tagInput.trim() !== '') {
@@ -582,16 +771,95 @@ export default {
       this.locationError = this.newMeeting.location ? '' : '会议地点不能为空';
     },
     validateStartTime() {
-      this.startTimeError = this.newMeeting.startTime ? '' : '会议开始时间不能为空';
+      console.log('startTime值为:', this.newMeeting.startTime);
+      if (!this.newMeeting.startTime) {
+        this.startTimeError = '会议开始时间不能为空';
+      } else {
+        this.startTimeError = '';
+        // 如果结束时间已经设置，验证开始时间是否早于结束时间
+        if (this.newMeeting.endTime) {
+          const startTime = new Date(this.newMeeting.startTime);
+          const endTime = new Date(this.newMeeting.endTime);
+          if (startTime >= endTime) {
+            this.startTimeError = '开始时间必须早于结束时间';
+          }
+        }
+      }
     },
     validateEndTime() {
-      this.endTimeError = this.newMeeting.endTime ? '' : '会议结束时间不能为空';
+      console.log('endTime值为:', this.newMeeting.endTime);
+      if (!this.newMeeting.endTime) {
+        this.endTimeError = '会议结束时间不能为空';
+      } else {
+        this.endTimeError = '';
+        // 如果开始时间已经设置，验证结束时间是否晚于开始时间
+        if (this.newMeeting.startTime) {
+          const startTime = new Date(this.newMeeting.startTime);
+          const endTime = new Date(this.newMeeting.endTime);
+          if (endTime <= startTime) {
+            this.endTimeError = '结束时间必须晚于开始时间';
+          }
+        }
+      }
+    },
+    validateManager() {
+      this.managerError = this.newMeeting.manager ? '' : '会议负责人不能为空';
     },
     openCreateMeetingModal() {
       console.log('Opening create meeting modal');
+      // 确保先重置表单
       this.resetForm();
+      // 初始化默认开始和结束时间
+      const now = new Date();
+      const formattedNow = this.formatDateTime(now);
+      const oneWeekLater = new Date(now);
+      oneWeekLater.setDate(now.getDate() + 7);
+      const formattedOneWeekLater = this.formatDateTime(oneWeekLater);
+      
+      this.newMeeting.startTime = formattedNow;
+      this.newMeeting.endTime = formattedOneWeekLater;
+      // 设置当前用户为管理员
+      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      this.newMeeting.manager = userInfo.username || '';
+      
+      // 然后显示模态窗口
       this.showCreateMeetingModal = true;
       console.log('showCreateMeetingModal:', this.showCreateMeetingModal);
+      // 使Vue在下一个事件循环中更新DOM
+      this.$nextTick(() => {
+        console.log('表单重置后的newMeeting:', this.newMeeting);
+        // 确保日期选择器正确渲染
+        const datePickers = document.querySelectorAll('.el-date-editor');
+        datePickers.forEach(picker => {
+          picker.style.width = '100%';
+        });
+        
+        // 额外对日期选择器容器进行处理
+        const datePickerWrappers = document.querySelectorAll('.date-picker-wrapper');
+        datePickerWrappers.forEach(wrapper => {
+          wrapper.style.position = 'relative';
+          wrapper.style.width = '100%';
+          wrapper.style.zIndex = '100';
+          
+          // 查找其中的日期选择器并设置宽度
+          const datePickerElement = wrapper.querySelector('.el-date-editor');
+          if (datePickerElement) {
+            datePickerElement.style.width = '100%';
+          }
+          
+          // 确保输入框宽度正确
+          const inputElement = wrapper.querySelector('.el-input__inner');
+          if (inputElement) {
+            inputElement.style.width = '100%';
+          }
+        });
+        
+        // 设置创建会议模态框的z-index，确保在日期选择器之下
+        const modalElement = document.querySelector('.create-meeting-modal');
+        if (modalElement) {
+          modalElement.style.zIndex = '2001';
+        }
+      });
     },
     addSubVenue() {
       this.newMeeting.subVenues.push({ name: '', location: '', capacity: 0 });
@@ -621,8 +889,163 @@ export default {
       this.initMeetings();
     },
     goToUserCenter() {
-      console.log('跳转到用户中心页面');
       this.$router.push('/user-center');
+    },
+    logout() {
+      logout(); // 调用API中的logout方法清除token
+      this.$message.success('退出登录成功');
+      this.$router.push('/'); // 跳转到首页
+    },
+    validateForm() {
+      // 验证必填字段
+      this.validateTitle();
+      this.validateStartTime();
+      this.validateEndTime();
+      this.validateLocation();
+      this.validateManager();
+      
+      // 验证分会场字段
+      let subVenuesValid = true;
+      if (this.newMeeting.subVenues && this.newMeeting.subVenues.length > 0) {
+        for (const venue of this.newMeeting.subVenues) {
+          if (!venue.name || !venue.capacity) {
+            subVenuesValid = false;
+            break;
+          }
+        }
+      }
+      
+      // 判断是否有错误
+      const hasErrors = this.titleError || this.startTimeError || this.endTimeError || 
+                        this.locationError || this.managerError || !subVenuesValid;
+      
+      if (hasErrors) {
+        // 显示错误信息
+        if (!subVenuesValid) {
+          this.$message.error('请完善分会场必填信息');
+        } else {
+          this.$message.error('请完善必填信息');
+        }
+        return false;
+      }
+      
+      return true;
+    },
+    closeModal() {
+      this.showCreateMeetingModal = false;
+      // 重置表单，避免下次打开时显示上次的数据
+      this.resetForm();
+    },
+    handleStartTimeChange(value) {
+      console.log('开始时间变化:', value);
+      this.validateStartTime();
+    },
+    handleEndTimeChange(value) {
+      console.log('结束时间变化:', value);
+      this.validateEndTime();
+    },
+    // 获取会议类型文本
+    getTypeText(type) {
+      const typeMap = {
+        'domestic': '国内会议',
+        'international': '国际会议',
+        'both': '国内、国际会议',
+        'offline': '线下会议',
+        'online': '线上会议',
+        'hybrid': '混合会议'
+      };
+      return typeMap[type] || type || '未知类型';
+    },
+    
+    // 获取会议状态文本
+    getStatusText(status) {
+      const statusMap = {
+        'preparing': '筹备中',
+        'ongoing': '进行中',
+        'finished': '已结束',
+        'upcoming': '筹备中',
+        'confirmed': '已确认',
+        'completed': '已结束',
+        'draft': '草稿'
+      };
+      return statusMap[status] || status || '未知状态';
+    },
+    // 确认删除会议
+    confirmDeleteMeeting(meeting) {
+      this.$confirm(`确定要删除会议"${meeting.title}"吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.deleteMeeting(meeting.id);
+      }).catch(() => {
+        this.$message.info('已取消删除');
+      });
+    },
+    
+    // 删除会议
+    deleteMeeting(id) {
+      const loading = this.$loading({
+        lock: true,
+        text: '删除中...',
+        spinner: 'el-icon-loading',
+        background: 'rgba(0, 0, 0, 0.7)'
+      });
+      
+      console.log('删除会议，ID:', id);
+      
+      deleteMeeting(id)
+        .then(response => {
+          console.log('删除会议API响应:', response);
+          
+          // 兼容多种响应格式
+          const isSuccess = 
+            // 标准响应格式
+            (response && response.code === 200) || 
+            // 消息格式
+            (response && response.message === '会议删除成功') ||
+            // 字符串格式
+            (typeof response === 'string' && response.includes('成功')) ||
+            // 简单对象格式
+            (response && !response.error);
+          
+          if (isSuccess) {
+            this.$message.success('删除成功');
+            // 延迟一点再刷新，确保后端处理完成
+            setTimeout(() => {
+              this.initMeetings();
+            }, 300);
+          } else {
+            console.error('删除会议失败，响应:', response);
+            this.$message.error((response && response.msg) || '删除失败');
+            // 尝试刷新列表，因为可能已经成功删除
+            setTimeout(() => {
+              this.initMeetings();
+            }, 500);
+          }
+        })
+        .catch(error => {
+          console.error('删除会议发生错误:', error);
+          this.$message.error(handleApiError(error));
+          // 同样尝试刷新，因为错误可能是前端解析问题
+          setTimeout(() => {
+            this.initMeetings();
+          }, 500);
+        })
+        .finally(() => {
+          loading.close();
+        });
+    },
+    // 格式化日期时间为 yyyy-MM-dd HH:mm:ss
+    formatDateTime(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     },
   }
 }
@@ -760,46 +1183,80 @@ export default {
 /* 会议卡片样式 */
 .meetings-table-container {
   background: white;
-  border-radius: 10px;
-  padding: 20px;
+  border-radius: 16px;
+  padding: 24px;
   overflow-x: auto;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
 
 .meetings-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .meetings-table th, .meetings-table td {
   padding: 16px;
   text-align: left;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #eaedf2;
   vertical-align: middle;
 }
 
 .meetings-table th {
-  background-color: #f5f7fa;
+  background-color: #f8f9fc;
   font-weight: 600;
-  color: #666;
+  color: #5e6c84;
   font-size: 14px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.meetings-table th:first-child {
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+
+.meetings-table th:last-child {
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.meetings-table tr {
+  transition: background-color 0.2s;
+}
+
+.meetings-table tbody tr:hover {
+  background-color: #f8faff;
 }
 
 .meeting-name-cell {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .meeting-name-cell i {
-  color: #999;
-  font-size: 16px;
+  color: #007aff;
+  font-size: 18px;
+  margin-top: 3px;
+}
+
+.meeting-name-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
 }
 
 .meeting-title {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: #2c3e50;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
 }
 
 .meeting-info-row {
@@ -810,8 +1267,14 @@ export default {
 
 .meeting-description-preview {
   font-size: 13px;
-  color: #666;
+  color: #7a869a;
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
 }
 
 .meeting-url {
@@ -828,33 +1291,132 @@ export default {
 }
 
 .meeting-type-badge, .meeting-status-badge {
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
   font-size: 13px;
   display: inline-flex;
   align-items: center;
   font-weight: 500;
+  white-space: nowrap;
+}
+
+.meeting-type-badge {
+  background-color: #f0f7ff;
+  color: #007aff;
+}
+
+.meeting-type-badge.domestic {
+  background-color: #e0f7fa;
+  color: #00acc1;
+}
+
+.meeting-type-badge.international {
+  background-color: #f3e5f5;
+  color: #ab47bc;
+}
+
+.meeting-type-badge.both {
+  background-color: #e8f5e9;
+  color: #43a047;
+}
+
+.meeting-type-badge.offline {
+  background-color: #e3f2fd;
+  color: #2196f3;
+}
+
+.meeting-type-badge.online {
+  background-color: #e8eaf6;
+  color: #3f51b5;
+}
+
+.meeting-type-badge.hybrid {
+  background-color: #fff8e1;
+  color: #ffa000;
+}
+
+.meeting-status-badge {
+  background-color: #eeeeee;
+  color: #757575;
+}
+
+.meeting-status-badge.upcoming, 
+.meeting-status-badge.preparing {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.meeting-status-badge.confirmed, 
+.meeting-status-badge.ongoing {
+  background-color: #e8f5e9;
+  color: #388e3c;
+}
+
+.meeting-status-badge.completed, 
+.meeting-status-badge.finished {
+  background-color: #f5f5f5;
+  color: #616161;
+}
+
+.meeting-status-badge.draft {
+  background-color: #fff3e0;
+  color: #ff9800;
 }
 
 .table-actions {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   justify-content: flex-end;
 }
 
 .action-button {
-  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border: none;
-  background: none;
-  border-radius: 4px;
+  background-color: #f0f7ff;
+  color: #007aff;
+  border-radius: 6px;
   cursor: pointer;
-  color: #666;
-  transition: all 0.3s;
+  transition: all 0.2s;
 }
 
 .action-button:hover {
-  background-color: #f0f0f0;
-  color: #333;
+  background-color: #e0f0ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 122, 255, 0.15);
+}
+
+.action-button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.action-button.edit-button {
+  background-color: #f0f7ff;
+  color: #007aff;
+}
+
+.action-button.view-button {
+  background-color: #f0f9f6;
+  color: #00c48c;
+}
+
+.action-button.settings-button {
+  background-color: #f6f7f9;
+  color: #5e6c84;
+}
+
+.action-button.delete-button {
+  background-color: #ff3b30;
+  color: white;
+}
+
+.action-button.delete-button:hover {
+  background-color: #e60000;
 }
 
 /* 搜索和筛选区域样式 */
@@ -951,79 +1513,141 @@ th {
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 2000;
 }
 
 .modal {
-  background-color: white;
-  padding: 24px;
+  background-color: #fff;
   border-radius: 12px;
-  width: 600px;
-  max-width: 90%;
+  width: 800px;
+  max-width: 95%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
   transition: transform 0.3s ease, opacity 0.3s ease;
+  z-index: 2001;
 }
 
 .modal-header {
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #eee;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eaedf2;
+  background-color: #f8f8f8;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  user-select: none;
 }
 
 .modal-header h3 {
-  font-size: 22px;
+  font-size: 16px;
   color: #333;
-  font-weight: bold;
+  font-weight: 500;
+  margin: 0;
+  flex: 1;
+  text-align: center;
+}
+
+.modal-body {
+  padding: 20px 24px;
+}
+
+.mac-window-controls {
+  padding-left: 8px;
 }
 
 .modal-footer {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #eee;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  padding: 20px 24px;
+  margin-top: 16px;
+  border-top: 1px solid #eaedf2;
 }
 
-.cancel-button, .submit-button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
+.buttons-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+.draft-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background-color: white;
+  color: #7a869a;
+  border: 1px solid #e0e5ee;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  font-size: 16px;
-  transition: background-color 0.3s, transform 0.2s;
+  transition: all 0.2s;
+}
+
+.draft-button:hover {
+  background-color: #f5f7fa;
 }
 
 .cancel-button {
-  background-color: #ff3b30;
-  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background-color: white;
+  color: #ff3b30;
+  border: 1px solid #ff3b30;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .cancel-button:hover {
-  background-color: #e60000;
+  background-color: #fff8f8;
 }
 
 .submit-button {
-  background-color: #007aff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background-color: #34c759;
   color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
 }
 
 .submit-button:hover {
-  background-color: #005bb5;
+  background-color: #28a745;
 }
 
-.submit-button:active {
-  transform: scale(0.95);
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #666;
+}
+
+.loading-container i {
+  font-size: 32px;
+  color: #409EFF;
+  margin-bottom: 16px;
 }
 
 .empty-state {
   text-align: center;
   padding: 40px;
   color: #666;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  margin-top: 16px;
 }
 
 .empty-state .empty-icon {
@@ -1172,5 +1796,581 @@ th {
 .username:hover {
   color: #409EFF;
   text-decoration: underline;
+}
+
+.steps-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding: 0 10px;
+}
+
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  cursor: pointer;
+  transition: all 0.3s;
+  padding: 15px 0;
+}
+
+.step-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  right: -50%;
+  width: 100%;
+  height: 2px;
+  background-color: #ddd;
+  z-index: 0;
+}
+
+.step-item.active:not(:last-child)::after,
+.step-item.completed:not(:last-child)::after {
+  background-color: #007aff;
+}
+
+.step-number {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #f5f7fa;
+  border: 2px solid #ddd;
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.step-item.active .step-number {
+  background-color: #007aff;
+  color: white;
+  border-color: #007aff;
+}
+
+.step-item.completed .step-number {
+  background-color: #007aff;
+  color: white;
+  border-color: #007aff;
+}
+
+.step-title {
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.step-item.active .step-title {
+  color: #007aff;
+  font-weight: 600;
+}
+
+.required-mark {
+  color: #ff3b30;
+  font-weight: bold;
+}
+
+.char-count {
+  text-align: right;
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.tags-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background-color: #f0f7ff;
+  border-radius: 20px;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.tag-item i {
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.tag-item:hover {
+  background-color: #e0f0ff;
+}
+
+.tags-input-wrapper {
+  display: flex;
+  gap: 10px;
+}
+
+.add-tag-btn {
+  padding: 8px 16px;
+  background-color: #007aff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.add-tag-btn:hover {
+  background-color: #005bb5;
+}
+
+.radio-group {
+  display: flex;
+  gap: 20px;
+  margin-top: 8px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.empty-venues {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border: 1px dashed #ddd;
+  padding: 30px;
+  margin: 20px 0;
+}
+
+.empty-icon {
+  font-size: 48px;
+  color: #ccc;
+  margin-bottom: 16px;
+}
+
+.empty-text {
+  color: #999;
+}
+
+.sub-venue-card {
+  background-color: white;
+  border-radius: 8px;
+  border: 1px solid #eee;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.venue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.venue-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.venue-delete {
+  padding: 6px;
+  background-color: #fff0f0;
+  color: #ff3b30;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.venue-delete:hover {
+  background-color: #ffe0e0;
+}
+
+.venue-content {
+  padding: 16px;
+}
+
+/* 添加日期选择器样式 */
+.date-picker-wrapper {
+  position: relative;
+  width: 100%;
+  margin-bottom: 5px;
+  z-index: 100;
+}
+
+/* 确保日期选择器显示正常 */
+.date-picker-wrapper >>> .el-input {
+  width: 100%;
+}
+
+.date-picker-wrapper >>> .el-input__inner {
+  width: 100%;
+}
+
+/* 确保日期选择器弹出面板在顶层显示 */
+.el-picker-panel {
+  z-index: 3000 !important;
+}
+
+.el-date-picker {
+  width: 100% !important;
+}
+
+/* 修复弹出层样式 */
+.modal-overlay {
+  z-index: 2000;
+}
+
+.modal {
+  z-index: 2001;
+}
+
+/* 修复el-date-picker中的图标显示 */
+.date-picker-wrapper >>> .el-input__icon {
+  line-height: 40px;
+}
+
+/* 新的卡片式表单样式 */
+.form-card {
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.form-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  background-color: #f7f8fa;
+  border-bottom: 1px solid #eaedf2;
+}
+
+.form-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.form-card-title i {
+  font-size: 18px;
+  color: #007aff;
+}
+
+.form-card-body {
+  padding: 24px;
+}
+
+/* 输入框样式优化 */
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon i {
+  position: absolute;
+  left: 12px;
+  color: #7a869a;
+  font-size: 16px;
+  z-index: 1;
+}
+
+.input-with-icon input {
+  padding-left: 40px;
+  height: 40px;
+  border: 1px solid #e0e5ee;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.input-with-icon input:focus {
+  border-color: #007aff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+/* 下拉选择框样式优化 */
+.select-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.select-with-icon i {
+  position: absolute;
+  left: 12px;
+  color: #7a869a;
+  font-size: 16px;
+  z-index: 1;
+}
+
+.select-with-icon select {
+  padding-left: 40px;
+  height: 40px;
+  border: 1px solid #e0e5ee;
+  border-radius: 8px;
+  background-color: white;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%237a869a'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  transition: all 0.3s;
+}
+
+.select-with-icon select:focus {
+  border-color: #007aff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+/* 文本区域样式优化 */
+.textarea-with-count {
+  position: relative;
+}
+
+.textarea-with-count textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e0e5ee;
+  border-radius: 8px;
+  min-height: 100px;
+  transition: all 0.3s;
+}
+
+.textarea-with-count textarea:focus {
+  border-color: #007aff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+.textarea-with-count .char-count {
+  position: absolute;
+  bottom: -22px;
+  right: 0;
+  font-size: 12px;
+  color: #7a869a;
+}
+
+/* 添加分会场按钮样式 */
+.add-venue-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background-color: #f0f7ff;
+  color: #007aff;
+  border: 1px solid #d0e2ff;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-venue-button:hover {
+  background-color: #e0f0ff;
+}
+
+.add-venue-button i {
+  font-size: 14px;
+}
+
+/* 分会场卡片样式优化 */
+.sub-venue-card {
+  background-color: #f9f9fc;
+  border: 1px solid #e0e5ee;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.venue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #f1f4f8;
+  border-bottom: 1px solid #e0e5ee;
+}
+
+.venue-title {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.venue-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: #fff2f2;
+  color: #ff3b30;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* Mac风格窗口控制按钮 */
+.mac-window-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.mac-close-button,
+.mac-minimize-button,
+.mac-maximize-button {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.mac-close-button {
+  background-color: #ff5f56;
+}
+
+.mac-minimize-button {
+  background-color: #ffbd2e;
+}
+
+.mac-maximize-button {
+  background-color: #27c93f;
+}
+
+.mac-close-button:hover {
+  background-color: #ff3026;
+}
+
+.mac-minimize-button:hover {
+  background-color: #ffac00;
+}
+
+.mac-maximize-button:hover {
+  background-color: #1aab2f;
+}
+
+.mac-close-button:hover .mac-close-icon,
+.mac-minimize-button:hover .mac-minimize-icon,
+.mac-maximize-button:hover .mac-maximize-icon {
+  opacity: 1;
+}
+
+.mac-close-icon,
+.mac-minimize-icon,
+.mac-maximize-icon {
+  opacity: 0;
+  position: relative;
+  width: 8px;
+  height: 8px;
+}
+
+.mac-close-icon:before,
+.mac-close-icon:after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 1px;
+  background-color: rgba(0, 0, 0, 0.5);
+  top: 3.5px;
+  left: 0;
+}
+
+.mac-close-icon:before {
+  transform: rotate(45deg);
+}
+
+.mac-close-icon:after {
+  transform: rotate(-45deg);
+}
+
+.mac-minimize-icon:before {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 1px;
+  background-color: rgba(0, 0, 0, 0.5);
+  top: 3.5px;
+  left: 0;
+}
+
+.mac-maximize-icon:before {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  top: 0;
+  left: 0;
+}
+
+.header-placeholder {
+  width: 36px; /* 与mac-window-controls宽度保持一致 */
+}
+
+.date-time-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #606266;
+  transition: border-color 0.2s;
+}
+
+.date-time-input:hover {
+  border-color: #c0c4cc;
+}
+
+.date-time-input:focus {
+  outline: none;
+  border-color: #409eff;
+}
+
+.meeting-manager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #555;
+}
+
+.meeting-manager i {
+  font-size: 16px;
+  color: #3498db;
 }
 </style> 
